@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#111111">
+    <title>HyperOS Ultimate Edition</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: #f5f5f5;
+            color: #171717;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                         Roboto, Arial, sans-serif;
+        }
+
+        .app {
+            max-width: 520px;
+            margin: auto;
+            padding: 18px;
+        }
+
+        .header {
+            padding: 12px 4px 20px;
+        }
+
+        .title {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            margin-top: 5px;
+            color: #777;
+            font-size: 14px;
+        }
+
+        .card {
+            background: #ffffff;
+            border-radius: 24px;
+            padding: 20px;
+            margin-bottom: 14px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        }
+
+        .hero {
+            padding: 24px;
+        }
+
+        .hero-label {
+            color: #777;
+            font-size: 13px;
+        }
+
+        .hero-value {
+            margin-top: 5px;
+            font-size: 36px;
+            font-weight: 700;
+        }
+
+        .hero-status {
+            margin-top: 8px;
+            font-size: 14px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .stat-title {
+            color: #777;
+            font-size: 12px;
+        }
+
+        .stat-value {
+            margin-top: 7px;
+            font-size: 20px;
+            font-weight: 650;
+        }
+
+        .section-title {
+            font-size: 17px;
+            font-weight: 650;
+            margin-bottom: 14px;
+        }
+
+        .mode {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 0;
+            border-bottom: 1px solid #eeeeee;
+        }
+
+        .mode:last-child {
+            border-bottom: none;
+        }
+
+        .mode-name {
+            font-weight: 600;
+        }
+
+        .mode-desc {
+            margin-top: 3px;
+            color: #888;
+            font-size: 12px;
+        }
+
+        .switch {
+            width: 48px;
+            height: 28px;
+            border: 0;
+            border-radius: 20px;
+            background: #d8d8d8;
+            position: relative;
+        }
+
+        .switch::after {
+            content: "";
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            top: 3px;
+            left: 3px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform 0.2s ease;
+        }
+
+        .switch.active {
+            background: #222;
+        }
+
+        .switch.active::after {
+            transform: translateX(20px);
+        }
+
+        .info {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 14px;
+        }
+
+        .info span:first-child {
+            color: #777;
+        }
+
+        .footer {
+            text-align: center;
+            color: #999;
+            font-size: 11px;
+            padding: 12px 0 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="app">
+
+    <div class="header">
+        <div class="title">HyperOS Ultimate</div>
+        <div class="subtitle">
+            Sweet / Sweetin • SuperRyzeNS
+        </div>
+    </div>
+
+    <div class="card hero">
+        <div class="hero-label">Device Temperature</div>
+        <div class="hero-value" id="temperature">--°C</div>
+        <div class="hero-status" id="thermalStatus">
+            Thermal status unavailable
+        </div>
+    </div>
+
+    <div class="grid">
+
+        <div class="card">
+            <div class="stat-title">Battery</div>
+            <div class="stat-value" id="battery">--%</div>
+        </div>
+
+        <div class="card">
+            <div class="stat-title">Gaming</div>
+            <div class="stat-value" id="gaming">OFF</div>
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <div class="section-title">
+            Performance Profiles
+        </div>
+
+        <div class="mode">
+            <div>
+                <div class="mode-name">Gaming Mode</div>
+                <div class="mode-desc">
+                    Adaptive thermal gaming profile
+                </div>
+            </div>
+
+            <button class="switch"
+                    id="gamingSwitch"
+                    onclick="toggleGaming()">
+            </button>
+        </div>
+
+        <div class="mode">
+            <div>
+                <div class="mode-name">Battery Mode</div>
+                <div class="mode-desc">
+                    Efficiency-focused profile
+                </div>
+            </div>
+
+            <button class="switch"
+                    id="batterySwitch"
+                    onclick="toggleBattery()">
+            </button>
+        </div>
+
+        <div class="mode">
+            <div>
+                <div class="mode-name">Smoothness</div>
+                <div class="mode-desc">
+                    Responsive UI profile
+                </div>
+            </div>
+
+            <button class="switch active"
+                    id="smoothSwitch"
+                    onclick="toggleSmoothness()">
+            </button>
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <div class="section-title">
+            System
+        </div>
+
+        <div class="info">
+            <span>Device</span>
+            <span id="device">Detecting...</span>
+        </div>
+
+        <div class="info">
+            <span>Codename</span>
+            <span id="codename">Detecting...</span>
+        </div>
+
+        <div class="info">
+            <span>Kernel</span>
+            <span id="kernel">Detecting...</span>
+        </div>
+
+        <div class="info">
+            <span>Module</span>
+            <span>v1.0.0</span>
+        </div>
+
+    </div>
+
+    <div class="footer">
+        HyperOS Ultimate Edition<br>
+        Independent project for Sweet / Sweetin
+    </div>
+
+</div>
+
+<script>
+
+let gamingEnabled = false;
+let batteryEnabled = false;
+let smoothnessEnabled = true;
+
+function toggleGaming() {
+    gamingEnabled = !gamingEnabled;
+
+    document
+        .getElementById("gamingSwitch")
+        .classList.toggle("active", gamingEnabled);
+
+    document.getElementById("gaming").textContent =
+        gamingEnabled ? "ON" : "OFF";
+}
+
+function toggleBattery() {
+    batteryEnabled = !batteryEnabled;
+
+    document
+        .getElementById("batterySwitch")
+        .classList.toggle("active", batteryEnabled);
+}
+
+function toggleSmoothness() {
+    smoothnessEnabled = !smoothnessEnabled;
+
+    document
+        .getElementById("smoothSwitch")
+        .classList.toggle("active", smoothnessEnabled);
+}
+
+function updateDemoData() {
+
+    /*
+     * WebUI backend integration will be added later.
+     * The current UI intentionally does not write
+     * directly to kernel interfaces.
+     */
+
+    document.getElementById("temperature").textContent = "--°C";
+    document.getElementById("battery").textContent = "--%";
+    document.getElementById("thermalStatus").textContent =
+        "Waiting for module backend";
+
+}
+
+updateDemoData();
+
+</script>
+
+</body>
+</html>
