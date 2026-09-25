@@ -1,10 +1,10 @@
 #!/system/bin/sh
 
 MODDIR="${0%/*}"
-LOG_DIR="/data/adb/hyperos_ultimate_edition"
-LOG_FILE="$LOG_DIR/service.log"
+STATE_DIR="/data/adb/hyperos_ultimate_edition"
+LOG_FILE="$STATE_DIR/service.log"
 
-mkdir -p "$LOG_DIR"
+mkdir -p "$STATE_DIR"
 
 log_msg() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
@@ -14,7 +14,7 @@ log_msg "========================================"
 log_msg "HyperOS Ultimate Edition service started"
 log_msg "========================================"
 
-# Give Android services time to finish booting.
+# Wait for Android to finish booting.
 sleep 20
 
 DEVICE="$(getprop ro.product.device)"
@@ -25,7 +25,7 @@ log_msg "Kernel: $KERNEL"
 
 case "$DEVICE" in
     sweet|sweetin)
-        log_msg "Supported device detected."
+        log_msg "Supported device detected: $DEVICE"
         ;;
     *)
         log_msg "Unsupported device. Service stopped."
@@ -33,6 +33,10 @@ case "$DEVICE" in
         ;;
 esac
 
+# Prepare script permissions.
+chmod 0755 "$MODDIR/scripts/"*.sh 2>/dev/null
+
+# Check SuperRyzeNS kernel.
 if echo "$KERNEL" | grep -iq "ryze"; then
     log_msg "SuperRyzeNS kernel detected."
 else
@@ -40,4 +44,25 @@ else
     log_msg "Compatibility is not guaranteed."
 fi
 
-log_msg "HyperOS Ultimate Edition initialization complete."
+# Start monitoring layers.
+if [ -x "$MODDIR/scripts/thermal_guard.sh" ]; then
+    "$MODDIR/scripts/thermal_guard.sh" &
+    log_msg "Thermal monitor started."
+fi
+
+if [ -x "$MODDIR/scripts/gaming_mode.sh" ]; then
+    "$MODDIR/scripts/gaming_mode.sh" &
+    log_msg "Gaming monitor started."
+fi
+
+if [ -x "$MODDIR/scripts/battery.sh" ]; then
+    "$MODDIR/scripts/battery.sh" &
+    log_msg "Battery monitor started."
+fi
+
+if [ -x "$MODDIR/scripts/system_tweaks.sh" ]; then
+    "$MODDIR/scripts/system_tweaks.sh" &
+    log_msg "System optimization layer started."
+fi
+
+log_msg "All HyperOS Ultimate Edition services initialized."
