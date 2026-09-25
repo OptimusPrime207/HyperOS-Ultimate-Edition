@@ -1,6 +1,5 @@
 #!/system/bin/sh
 
-MODDIR="${0%/*}"
 STATE_DIR="/data/adb/hyperos_ultimate_edition"
 LOG_FILE="$STATE_DIR/thermal.log"
 
@@ -12,8 +11,6 @@ POLICY6="/sys/devices/system/cpu/cpufreq/policy6/scaling_max_freq"
 ORIGINAL0="$STATE_DIR/original_policy0_max"
 ORIGINAL6="$STATE_DIR/original_policy6_max"
 
-THERMAL_ZONE="/sys/class/thermal/thermal_zone73/temp"
-
 POLL_INTERVAL=3
 
 log_msg() {
@@ -21,9 +18,7 @@ log_msg() {
 }
 
 is_supported_device() {
-    DEVICE="$(getprop ro.product.device)"
-
-    case "$DEVICE" in
+    case "$(getprop ro.product.device)" in
         sweet|sweetin)
             return 0
             ;;
@@ -35,6 +30,22 @@ is_supported_device() {
 
 is_superryzens() {
     uname -r | grep -iq "superryzens"
+}
+
+find_cpu_thermal_zone() {
+    for zone in /sys/class/thermal/thermal_zone*; do
+        [ -f "$zone/type" ] || continue
+
+        TYPE="$(cat "$zone/type" 2>/dev/null)"
+
+        if [ "$TYPE" = "cpu_therm" ]; then
+            echo "$zone/temp"
+            return 0
+        fi
+    done
+
+    echo ""
+    return 1
 }
 
 read_temp() {
@@ -51,7 +62,6 @@ read_temp() {
 }
 
 save_original_limits() {
-
     if [ ! -f "$ORIGINAL0" ] && [ -f "$POLICY0" ]; then
         cat "$POLICY0" > "$ORIGINAL0"
     fi
@@ -62,63 +72,68 @@ save_original_limits() {
 }
 
 restore_original_limits() {
-
     if [ -f "$ORIGINAL0" ]; then
-        ORIGINAL="$(cat "$ORIGINAL0" 2>/dev/null)"
+        VALUE="$(cat "$ORIGINAL0" 2>/dev/null)"
 
-        case "$ORIGINAL" in
+        case "$VALUE" in
             ''|*[!0-9]*)
                 ;;
             *)
-                echo "$ORIGINAL" > "$POLICY0" 2>/dev/null
+                echo "$VALUE" > "$POLICY0" 2>/dev/null
                 ;;
         esac
     fi
 
     if [ -f "$ORIGINAL6" ]; then
-        ORIGINAL="$(cat "$ORIGINAL6" 2>/dev/null)"
+        VALUE="$(cat "$ORIGINAL6" 2>/dev/null)"
 
-        case "$ORIGINAL" in
+        case "$VALUE" in
             ''|*[!0-9]*)
                 ;;
             *)
-                echo "$ORIGINAL" > "$POLICY6" 2>/dev/null
+                echo "$VALUE" > "$POLICY6" 2>/dev/null
                 ;;
         esac
     fi
 }
 
 set_cpu_ceiling() {
-
     LEVEL="$1"
 
     case "$LEVEL" in
 
         80)
-            # ~80% of each policy's maximum.
-            # Mapped to the nearest supported frequency
-            # not exceeding the target.
+            # policy0: 1.4976 GHz
+            # policy6: 1.8432 GHz
             echo 1497600 > "$POLICY0" 2>/dev/null
             echo 1843200 > "$POLICY6" 2>/dev/null
             ;;
 
         70)
+            # policy0: 1.248 GHz
+            # policy6: 1.5552 GHz
             echo 1248000 > "$POLICY0" 2>/dev/null
             echo 1555200 > "$POLICY6" 2>/dev/null
             ;;
 
         62)
+            # policy0 minimum-safe ceiling: 1.0176 GHz
+            # policy6: 1.3248 GHz
             echo 1017600 > "$POLICY0" 2>/dev/null
             echo 1324800 > "$POLICY6" 2>/dev/null
             ;;
 
         55)
+            # policy0 cannot go below its current minimum.
+            # policy6: 1.2096 GHz
             echo 1017600 > "$POLICY0" 2>/dev/null
             echo 1209600 > "$POLICY6" 2>/dev/null
             ;;
 
         50)
-            echo 768000 > "$POLICY0" 2>/dev/null
+            # policy0 cannot go below its current minimum.
+            # policy6: 1.0944 GHz
+            echo 1017600 > "$POLICY0" 2>/dev/null
             echo 1094400 > "$POLICY6" 2>/dev/null
             ;;
 
@@ -126,7 +141,6 @@ set_cpu_ceiling() {
 }
 
 get_gaming_state() {
-
     if [ -f "$STATE_DIR/gaming_active" ]; then
         echo 1
     else
@@ -135,7 +149,6 @@ get_gaming_state() {
 }
 
 cleanup() {
-
     restore_original_limits
 
     rm -f \
@@ -152,7 +165,7 @@ trap cleanup INT TERM EXIT
 
 
 # --------------------------------------------------
-# INITIAL VALIDATION
+# VALIDATION
 # --------------------------------------------------
 
 if ! is_supported_device; then
@@ -170,29 +183,29 @@ if [ ! -f "$POLICY0" ] || [ ! -f "$POLICY6" ]; then
     exit 0
 fi
 
-if [ ! -f "$THERMAL_ZONE" ]; then
+THERMAL_ZONE="$(find_cpu_thermal_zone)"
+
+if [ -z "$THERMAL_ZONE" ] || [ ! -f "$THERMAL_ZONE" ]; then
     log_msg "cpu_therm sensor unavailable."
     exit 0
 fi
 
 
 # --------------------------------------------------
-# START
+# INITIALIZE
 # --------------------------------------------------
 
 save_original_limits
 
-log_msg "Thermal guard v2 initialized."
+log_msg "Thermal guard v2.1 initialized."
+log_msg "Thermal sensor: $THERMAL_ZONE"
 log_msg "Original policy0 max: $(cat "$ORIGINAL0" 2>/dev/null)"
 log_msg "Original policy6 max: $(cat "$ORIGINAL6" 2>/dev/null)"
 
 CURRENT_LEVEL=""
-
-LAST_TEMP=0
 LAST_GAME=0
 
-TEMP_LEVEL=80
-PENDING_LEVEL=80
+PENDING_LEVEL=""
 PENDING_COUNT=0
 
 
@@ -211,15 +224,11 @@ while true; do
     fi
 
 
-    # ----------------------------------------------
     # Gaming started
-    # ----------------------------------------------
-
     if [ "$GAME" = "1" ] && [ "$LAST_GAME" = "0" ]; then
 
         log_msg "Gaming mode detected."
 
-        # Start gaming with 80% ceiling.
         set_cpu_ceiling 80
 
         CURRENT_LEVEL=80
@@ -231,37 +240,26 @@ while true; do
     fi
 
 
-    # ----------------------------------------------
     # Gaming active
-    # ----------------------------------------------
-
     if [ "$GAME" = "1" ]; then
 
         TARGET_LEVEL=80
 
-        TEMP_C="$TEMP"
-
-        if [ "$TEMP_C" -lt 40000 ]; then
+        if [ "$TEMP" -lt 40000 ]; then
             TARGET_LEVEL=80
 
-        elif [ "$TEMP_C" -lt 41000 ]; then
+        elif [ "$TEMP" -lt 41000 ]; then
             TARGET_LEVEL=70
 
-        elif [ "$TEMP_C" -lt 42000 ]; then
+        elif [ "$TEMP" -lt 42000 ]; then
             TARGET_LEVEL=62
-
-        elif [ "$TEMP_C" -lt 43000 ]; then
-            TARGET_LEVEL=55
 
         else
             TARGET_LEVEL=50
         fi
 
 
-        # ------------------------------------------
-        # Two consecutive readings required
-        # ------------------------------------------
-
+        # Require two consecutive readings.
         if [ "$TARGET_LEVEL" = "$PENDING_LEVEL" ]; then
             PENDING_COUNT=$((PENDING_COUNT + 1))
         else
@@ -276,30 +274,24 @@ while true; do
             set_cpu_ceiling "$TARGET_LEVEL"
 
             CURRENT_LEVEL="$TARGET_LEVEL"
-
-            log_msg "CPU thermal level changed: ${TARGET_LEVEL}% | temp=${TEMP_C}m°C"
-
             PENDING_COUNT=0
+
+            log_msg "Thermal level: ${TARGET_LEVEL}% | temp=${TEMP}m°C"
         fi
 
     fi
 
 
-    # ----------------------------------------------
     # Gaming ended
-    # ----------------------------------------------
-
     if [ "$GAME" = "0" ] && [ "$LAST_GAME" = "1" ]; then
 
         restore_original_limits
 
-        rm -f "$STATE_DIR/thermal_level"
+        CURRENT_LEVEL=""
+        PENDING_LEVEL=""
+        PENDING_COUNT=0
 
         log_msg "Gaming ended. Original CPU limits restored."
-
-        CURRENT_LEVEL=""
-        PENDING_LEVEL=80
-        PENDING_COUNT=0
 
     fi
 
